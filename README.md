@@ -11,7 +11,7 @@ categorical, continuous, or discrete.
 
 Installation from GitHub:
 
-    . net ipwlogit dstat, replace from(https://raw.githubusercontent.com/benjann/ipwlogit/main/)
+    . net install ipwlogit, replace from(https://raw.githubusercontent.com/benjann/ipwlogit/main/)
 
 `ipwlogit` with option `psmethod(gologit)` requires
 [`gologit2`](https://www3.nd.edu/~rwilliam/gologit2/) by Richard Williams. Type
