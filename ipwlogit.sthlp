@@ -1,0 +1,372 @@
+{smcl}
+{* 15aug2022}{...}
+{hi:help ipwlogit}{...}
+{right:{browse "http://github.com/benjann/ipwlogit/"}}
+{hline}
+
+{title:Title}
+
+{pstd}{hi:ipwlogit} {hline 2} Marginal logistic regression by inverse probability weighting
+
+
+{title:Syntax}
+
+{p 8 15 2}
+    {cmd:ipwlogit} {depvar} {help varname:{it:tvar}} [{indepvars}] {ifin} {weight}
+    [{cmd:,}
+    {help ipwlogit##opt:{it:options}}
+    ]
+
+{synoptset 20 tabbed}{...}
+{marker opt}{synopthdr:options}
+{synoptline}
+{syntab :Main}
+{synopt :{cmdab:psm:ethod(}{help ipwlogit##psmethod:{it:method}{cmd:)}}}propensity
+    score estimation method
+    {p_end}
+{synopt :{cmdab:pso:pts(}{help ipwlogit##psopts:{it:options}{cmd:)}}}options
+    passed through to propensity score model
+    {p_end}
+{synopt :{opt bin:s(#)}}number of bins for continuous treatment; default is 20
+    {p_end}
+{synopt :{opt discr:ete}}treat continuous treatment as discrete
+    {p_end}
+{synopt :{opt asbal:anced}}use balanced design (non-stabilized weights)
+    {p_end}
+{synopt :{opt noi:sily}}display output from propensity score estimation
+    {p_end}
+{synopt :{opt nocons:tant}}suppress constant term in outcome model
+    {p_end}
+{synopt :{help logit##maximize_options:{it:maximize_options}}}maximization options
+    for outcome model; seldom used
+    {p_end}
+{synopt :{opth gen:erate(newvar)}}store IPWs
+    {p_end}
+{synopt :{opth tgen:erate(newvar)}}store binned treatment variable
+    {p_end}
+{synopt :{opt replace}}allow replacing existing variables
+    {p_end}
+
+{syntab :SE/Robust}
+{synopt :{cmd:vce(}{help ipwlogit##vcetype:{it:vcetype}}{cmd:)}}variance estimation
+    method; {it:vcetype} may be {cmdab:r:obust}, {cmdab:cl:uster} {it:clustvar},
+    {cmdab:boot:strap}, or {cmdab:jack:knife}
+    {p_end}
+{synopt :{opt novceadj:ust}}treat IPWs as fixed
+    {p_end}
+{synopt :{opt ifgen:erate(spec)}}store influence functions; {it:spec} may be
+    {it:namelist} or {it:stub}{cmd:*}
+    {p_end}
+
+{syntab :Reporting}
+{synopt :{opt l:evel(#)}}set confidence level; default is {cmd:level(95)}
+    {p_end}
+{synopt :{opt or}}report odds ratio
+    {p_end}
+{synopt :{opt nohead:er}}suppress table header
+    {p_end}
+{synopt :{opt notab:le}}suppress table of results
+    {p_end}
+{synopt :{opt noipw:stats}}suppress table of IPW statistics
+    {p_end}
+{synopt :{help estimation options##display_options:{it:display_options}}}standard display option
+    {p_end}
+{synopt :{opt coefl:egend}}display legend instead of statistics
+    {p_end}
+{synoptline}
+{pstd}
+    {it:tvar} may be a factor variable; see {help fvvarlist}.
+    {p_end}
+{pstd}
+    {it:indepvars} may contain factor variables; see {help fvvarlist}.
+    {p_end}
+{pstd}
+    {cmd:pweight}s and {cmd:aweight}s are allowed; see help
+    {help weight}.
+    {p_end}
+
+
+{title:Description}
+
+{pstd}
+    {cmd:ipwlogit} fits marginal logistic regression of {it:depvar} on
+    {it:tvar}, possibly adjusting for {it:indepvars} by inverse probability
+    weighting (IPW). The resulting estimate can be interpreted as a marginal (log)
+    odds ratio of a positive outcome. {it:depvar} equal to nonzero and nonmissing
+    (typically {it:depvar} equal to one) indicates a positive outcome, whereas
+    {it:depvar} equal to zero indicates a negative outcome.
+
+{pstd}
+    {it:tvar} can be categorical, continuous, or discrete. A categorical treatment must
+    be specified using factor variable notation, that is, as {cmd:i.}{it:varname},
+    where {it:varname} is the name of the treatment variable; see
+    {help fvvarlist}. In case of a continuous treatment, the inverse probability
+    weights will be estimated based on a coarsened variable that divides the treatment
+    into a series of equal probability bins. To declare a variable as discrete,
+    specify option {cmd:discrete}; in this case no binning will be applied (i.e.,
+    each observed treatment level has its own bin).
+
+
+{title:Options}
+
+{marker psmethod}{...}
+{phang}
+    {opt psmethod(method)} selects the propensity score estimation method. Supported
+    methods are as follows.
+
+{p2colset 13 22 24 2}{...}
+{p2col:{opt l:ogit}}for each treatment level, fit
+    a logistic regression of the level against all other levels
+    (using command {helpb logit})
+    {p_end}
+{p2col:{opt m:logit}}fit a multinomial logistic regression across all
+    levels (using command {helpb mlogit})
+    {p_end}
+{p2col:{opt o:logit}}fit an ordered logistic regression across all
+    levels (using command {helpb ologit})
+    {p_end}
+{p2col:{opt go:logit}}fit a generalized ordered logistic regression  across all
+    levels; this requires command {helpb gologit2} by Williams (2006)
+    to be installed on the system (type {stata ssc install gologit2})
+    {p_end}
+{p2col:{opt co:logit}}fit a series of cumulative odds models across
+    treatment levels (using command {helpb logit}); this is asymptotically
+    equivalent to {helpb gologit2}, but with less computational burden
+    {p_end}
+
+{pmore}
+    The default method depends on the type of the treatment variable. For a categorical
+    treatment with two levels (dichotomous treatment), the default is {cmd:logit}; for
+    a categorical treatment with more than two levels, the default is {cmd:mlogit}, for a
+    continuous or discrete treatment, {cmd:cologit} is the default. For a dichotomous treatment,
+    the choice of method does not matter; results will always be the same. For an
+    ordered categorical treatment, you may want to consider {cmd:cologit}
+    (or {cmd:gologit} or {cmd:ologit}) instead of {cmd:mlogit}.
+
+{marker psopts}{...}
+{phang}
+    {opt psopts(options)} specifies options to be passed through to the
+    propensity score estimation command. This may be useful, for example,
+    to specify constraints. See the help file of the relevant command
+    ({helpb logit}, {helpb mlogit}, {helpb ologit}, or {helpb gologit2}) for
+    information on available options. The following options are not allowed: {cmd:base()}
+    for {helpb mlogit}; {cmd:link()} for {helpb gologit2}.
+
+{phang}
+    {opt bins(#)} sets the number of quantile bins used to categorize a continuous
+    treatment. The default is 20. The resulting number of bins my be less than
+    20 if there is heaping in the distribution of the treatment variable.
+
+{phang}
+    {opt discrete} declared the treatment variable as discrete. In this case,
+    the variable will not be categorized based on quantiles. Use this option for
+    a quantitative treatment with relatively few distinct levels.
+
+{phang}
+    {opt asbalanced} scales the inverse probability weights in a way such that
+    they correspond to a balanced design in which each treatment level has the
+    same marginal probability. By default, {cmd:ipwlogit} uses so-called stabilized
+    weights that are scaled such that the sum of weights within each treatment
+    level corresponds to the relative frequency of the level (in expectation). Use
+    {cmd:asbalanced} to request non-stabilized weights that are scaled such that
+    the sum of weights within each treatment levels is the same (in expectation).
+
+{phang}
+    {opt noisily} displays the output from the models used to estimate
+    propensity scores. By default, such output is suppressed.
+
+{phang}
+    {opt noconstant} suppresses the constant term (intercept) in the outcome
+    model. This may be useful if you want to report odds by levels of a
+    categorical treatment rather than odds ratios with respect to the base
+    level (specify {it:tvar} as {cmd:ibn.}{it:varname} in this case).
+
+{phang}
+    {it:maximize_options} are maximization options for the outcome model. See
+    help {helpb logit##maximize_options:logit} for details.
+
+{phang}
+    {opt generate(newvar)} stores the inverse probability weights (IPWs) in variable
+    {newvar}. The stored IPWs are net of sampling weights. To obtain overall weights,
+    multiply the IPWs by the sampling weights. Option {cmd:generate()} is not
+    allowed with {cmd:vce(bootstrap)} or {cmd:vce(jackknife)}.
+
+{phang}
+    {opt tgenerate(newvar)} stores the binned treatment in variable
+    {newvar}. Option {cmd:tgenerate()} is not
+    allowed with {cmd:vce(bootstrap)} or {cmd:vce(jackknife)}, or if the
+    treatment variable is categorical.
+
+{phang}
+    {opt replace} allows to overwrite existing variables.
+
+{marker vcetype}{...}
+{phang}
+    {cmd:vce(}{it:vcetype}{cmd:)} specifies the type of standard error
+    reported. {it:vcetype} may be {cmd:robust} (robust standard errors),
+    {cmdab:cl:uster} {it:clustvar} (cluster-robust standard errors), {cmdab:boot:strap}
+    or {cmdab:jack:knife}; for bootstrap and jackknife see {it:{help vce_option}}. The
+    default is {cmd:vce(robust)}.
+
+{phang}
+    {opt novceadjust} assumes the IPWs as fixed (rather than estimated)
+    when computing standard errors. This typically leads to slightly
+    conservative results. {cmd:iweight}s imply {cmd:novceadjust}, as do
+    {cmd:vce(bootstrap)} and {cmd:vce(jackknife)} (to save computer time).
+
+{phang}
+    {opt ifgenerate(spec)} stores the influence functions of the parameters of the
+    outcome model. Either specify a list of new variables names,
+    or specify {it:stub}{cmd:*}, in which case the new variables will be named
+    {it:stub}{cmd:1}, {it:stub}{cmd:2}, etc. Option {cmd:ifgenerate()} is not
+    allowed with {cmd:vce(bootstrap)} or {cmd:vce(jackknife)}.
+
+{phang}
+    {opt level(#)} specifies the confidence level, as a percentage, for
+    confidence intervals. The default is {cmd:level(95)} or as
+    set by {helpb set level}.
+
+{phang}
+    {opt or} reports the estimated coefficients transformed to odds ratios,
+    that is, exp(b) rather than b. Standard errors and confidence intervals are
+    similarly transformed. This option affects how results are displayed, not
+    how they are estimated. {cmd:or} may be specified at estimation or when
+    replaying previously estimated results.
+
+{phang}
+    {opt noheader} suppresses the display of the table header.
+
+{phang}
+    {opt notable} suppresses the display of the table of results.
+
+{phang}
+    {opt noipwstats} suppresses the display of the table of IPW statistics.
+
+{phang}
+    {it:display_options} are usual display options as documented in
+    {helpb estimation options##display_options:[R] Estimation options}.
+
+{phang}
+    {opt coeflegend} specifies that the legend of the coefficients and how to
+    specify them in an expression be displayed rather
+    than displaying the statistics for the coefficients.
+
+
+{title:Example}
+
+{pstd}
+    The following example illustrates how the adjusted marginal odds ratio can be
+    different from the conditional odds ratio:
+
+        {it:unadjusted marginal odds ratio}
+        . {stata webuse lbw}
+        . {stata logit low i.smoke, or vce(robust)}
+        . {stata ipwlogit low i.smoke, or}
+
+        {it:conditional odds ratio}
+        . {stata logit low i.smoke age lwt i.race ptl ht ui, or}
+
+        {it:adjusted marginal odds ratio}
+        . {stata ipwlogit low i.smoke age lwt i.race ptl ht ui, or}
+
+
+{title:Stored results}
+
+{pstd}
+{cmd:ipwlogit} stores the following in {cmd:e()}:
+
+{synoptset 23 tabbed}{...}
+{p2col 5 23 26 2: Scalars}{p_end}
+{synopt:{cmd:e(N)}}number of observations{p_end}
+{synopt:{cmd:e(tk)}}number of treatment levels{p_end}
+{synopt:{cmd:e(bins)}}number of requested bins; continuous treatment only{p_end}
+{synopt:{cmd:e(k)}}number of parameters in outcome model{p_end}
+{synopt:{cmd:e(k_eq)}}number of equations in outcome model{p_end}
+{synopt:{cmd:e(df_m)}}degrees of freedom of outcome model{p_end}
+{synopt:{cmd:e(r2_p)}}pseudo-R-squared of outcome model{p_end}
+{synopt:{cmd:e(ll)}}log likelihood of outcome model{p_end}
+{synopt:{cmd:e(ll_0)}}log likelihood of constant-only outcome model{p_end}
+{synopt:{cmd:e(N_cds)}}number of completely determined successes in outcome model{p_end}
+{synopt:{cmd:e(N_cdf)}}number of completely determined failures in outcome model{p_end}
+{synopt:{cmd:e(ic)}}number of iterations of outcome model{p_end}
+{synopt:{cmd:e(rc)}}return code of outcome model{p_end}
+{synopt:{cmd:e(converged)}}{cmd:1} if outcome model converged, {cmd:0} otherwise{p_end}
+{synopt:{cmd:e(N_clust)}}number of clusters{p_end}
+{synopt:{cmd:e(chi2)}}outcome model chi-squared{p_end}
+{synopt:{cmd:e(p)}}{it:p}-value for model test{p_end}
+{synopt:{cmd:e(rank)}}rank of {cmd:e(V)}{p_end}
+
+{p2col 5 23 26 2: Macros}{p_end}
+{synopt:{cmd:e(cmd)}}{cmd:ipwlogit}{p_end}
+{synopt:{cmd:e(cmdline)}}command as typed{p_end}
+{synopt:{cmd:e(title)}}title in estimation output{p_end}
+{synopt:{cmd:e(depvar)}}name of dependent variable{p_end}
+{synopt:{cmd:e(tvar)}}treatment variable specification{p_end}
+{synopt:{cmd:e(tname)}}name of treatment variable{p_end}
+{synopt:{cmd:e(ttype)}}{cmd:categorical}, {cmd:discrete}, or {cmd:continuous}; type of treatment variable{p_end}
+{synopt:{cmd:e(tlevels)}}list of treatment levels{p_end}
+{synopt:{cmd:e(tbase)}}base treatment level{p_end}
+{synopt:{cmd:e(indepvars)}}adjustment variables{p_end}
+{synopt:{cmd:e(psmethod)}}propensity score estimation method{p_end}
+{synopt:{cmd:e(psopts)}}options passed through to propensity score estimation{p_end}
+{synopt:{cmd:e(asbaanced)}}{cmd:asbaanced} or empty{p_end}
+{synopt:{cmd:e(mlopts)}}maximization options passed through to outcome model{p_end}
+{synopt:{cmd:e(wtype)}}weight type{p_end}
+{synopt:{cmd:e(wexp)}}weight expression{p_end}
+{synopt:{cmd:e(clustvar)}}name of cluster variable{p_end}
+{synopt:{cmd:e(chi2type)}}{cmd:Wald}; type of model chi-squared test{p_end}
+{synopt:{cmd:e(vce)}}{it:vcetype} specified in {cmd:vce()}{p_end}
+{synopt:{cmd:e(vcetype)}}title used to label Std. err.{p_end}
+{synopt:{cmd:e(vceadjust)}}{cmd:novceadjust} or empty{p_end}
+{synopt:{cmd:e(properties)}}{cmd:b V}{p_end}
+{synopt:{cmd:e(generate)}}name of variable containing IPWs{p_end}
+{synopt:{cmd:e(tgenerate)}}name of variable containing binned treatment{p_end}
+{synopt:{cmd:e(ifgenerate)}}names of variables containing IFs{p_end}
+
+{p2col 5 23 26 2: Matrices}{p_end}
+{synopt:{cmd:e(b)}}coefficient vector{p_end}
+{synopt:{cmd:e(V)}}variance-covariance matrix of the estimators{p_end}
+{synopt:{cmd:e(V_modelbased)}}model-based variance{p_end}
+{synopt:{cmd:e(at)}}breaks of continuous treatment or levels of discrete treatment{p_end}
+{synopt:{cmd:e(ipwstats)}}information on the distribution of the IPWs{p_end}
+
+{p2col 5 23 26 2: Functions}{p_end}
+{synopt:{cmd:e(sample)}}marks estimation sample{p_end}
+
+
+{title:Methods and Formulas}
+
+{pstd}
+    See Jann and Karlson (2022).
+
+
+{title:References}
+
+{phang}
+    Jann, Ben, and Kristian Bernt Karlson. 2022. Marginal odds ratios: What they
+    are, how to compute them, and why sociologists might want to use them. Working paper.
+    {p_end}
+{phang}
+    Williams, Richard. 2006. Generalized ordered logit/partial proportional odds
+    models for ordinal dependent variables. The Stata Journal
+    6(1):58-82. DOI: {browse "https://doi.org/10.1177/1536867X0600600104":10.1177/1536867X0600600104}
+    {p_end}
+
+{title:Author}
+
+{pstd}
+    Ben Jann, University of Bern, ben.jann@unibe.ch
+
+{pstd}
+    Thanks for citing this software as follows:
+
+{pmore}
+    Jann, B. (2022). ipwlogit: Stata module to fit marginal logistic regression by inverse probability weighting. Available from
+    {browse "http://github.com/benjann/ipwlogit/"}.
+
+
+{title:Also see}
+
+{psee}
+    Online:  help for
+    {helpb logit}, {helpb mlogit}, {helpb ologit}, {helpb gologit2} (if installed), {helpb riflogit} (if installed)

@@ -1,0 +1,8 @@
+v 3
+d ipwlogit: Stata module to fit marginal logistic regression by inverse probability weighting
+d 
+d Author: Ben Jann, University of Bern, ben.jann@unibe.ch
+d
+d Distribution-Date: 20220815
+f ipwlogit.sthlp
+f ipwlogit.ado

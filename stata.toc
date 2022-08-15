@@ -1,0 +1,2 @@
+v 3
+p ipwlogit Stata module to fit marginal logistic regression by inverse probability weighting
