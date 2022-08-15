@@ -1,4 +1,4 @@
-*! version 1.0.0  15aug2022  Ben Jann
+*! version 1.0.1  15aug2022  Ben Jann
 
 program ipwlogit, eclass properties(svyb svyj mi)
     version 11
@@ -95,7 +95,7 @@ program Display
 end
 
 program _ipwlogit, eclass
-    syntax varlist(min=1 numeric fv) [if] [in] [pw iw] [, ///
+    syntax varlist(min=1 numeric fv) [if] [in] [pw fw iw] [, ///
         PSMethod(str) PSOpts(str asis) ///
         NOBINARY /// undocumented; use general code even if treatment is binary
         BINs(numlist int max=1 >=2) DISCRete ASBALanced ///
@@ -221,7 +221,8 @@ program _ipwlogit, eclass
     tempvar Y
     qui gen byte `Y' = (`depvar'!=0) if `touse'
     sum `Y' if `touse' `awgt', meanonly
-    if r(N)==0 {
+    local N = r(N)
+    if `N'==0 {
         error 2000
     }
     if r(min)==r(max) {
@@ -497,7 +498,6 @@ program _ipwlogit, eclass
     else local vceopt
     logit `Y' `texpand' [iw=`wipw'] if `touse', noheader notable `vceopt' /*
         */ `constant' `mlopts'
-    local N = e(N)
     tempname b
     mat `b' = e(b)
     mat coleq `b' = "`depvar'"

@@ -24,5 +24,8 @@ to install `gologit2`.
 
 Main changes:
 
+    15aug2022 (version 1.0.1)
+    - fweights now supported
+    
     15aug2022 (version 1.0.0):
     - ipwlogit released on GitHub

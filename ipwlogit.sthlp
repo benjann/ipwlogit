@@ -81,7 +81,7 @@
     {it:indepvars} may contain factor variables; see {help fvvarlist}.
     {p_end}
 {pstd}
-    {cmd:pweight}s and {cmd:aweight}s are allowed; see help
+    {cmd:pweight}s, {cmd:fweight}s, and {cmd:iweight}s are allowed; see help
     {help weight}.
     {p_end}
 
