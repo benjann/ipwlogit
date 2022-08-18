@@ -1,7 +1,7 @@
-*! version 1.0.1  15aug2022  Ben Jann
+*! version 1.0.3  16aug2022  Ben Jann
 
 program ipwlogit, eclass properties(svyb svyj mi)
-    version 11
+    version 14
     if replay() {
         Display `0'
         exit
@@ -66,9 +66,9 @@ program Display
     if "`or'"!="" local eform eform(Odds Ratio)
     if "`header'"=="" {
         local w1 17
-        local c1 48
+        local c1 49
         local c2 = `c1' + `w1' + 1
-        local w2 11
+        local w2 10
         local headopts head2left(`w1') head2right(`w2')
         if      c(stata_version)<17            local headopts
         else if d(`c(born_date)')<d(13jul2021) local headopts
@@ -102,7 +102,7 @@ program _ipwlogit, eclass
         GENerate(name) TGENerate(name) IFGENerate(str) replace ///
         vce(passthru) Robust CLuster(passthru) NOVCEADJust ///
         NOIsily eform(passthru) noHEADer noIPWstats noTABle ///
-        noCONStant * ]
+        noCONStant noDOTs * ]
     
     // generate option
     if "`generate'`tgenerate'"!="" & "`replace'"=="" {
@@ -165,9 +165,9 @@ program _ipwlogit, eclass
     _fv_check_depvar `depvar'
     fvexpand `tvar' if `touse'
     local texpand `"`r(varlist)'"'
-    if `"`r(fvops)'"'!="" local ttype "categorical"
+    if `"`r(fvops)'"'!="" local ttype "factor"
     else                  local ttype "continuous"
-    if "`ttype'"=="categorical" {
+    if "`ttype'"=="factor" {
         if "`bins'"!="" {
             di as err "{bf:bins()} not allowed with categorical treatment"
             exit 198
@@ -234,7 +234,7 @@ program _ipwlogit, eclass
     
     // process treatment variable
     // - categorical
-    if "`ttype'"=="categorical" {
+    if "`ttype'"=="factor" {
         _collect_fvinfo `texpand' // returns tname, tk, tlevels, tbase
         local T `tname'
         if `tk'<2 {
@@ -293,7 +293,7 @@ program _ipwlogit, eclass
     // compute IPWs
     if "`noisily'"=="" {
         local qui quietly
-        di as txt "(estimating balancing weights " _c
+        if "`dots'"=="" di as txt "(estimating balancing weights " _c
     }
     tempvar ipw
     qui gen double `ipw' = .
@@ -301,7 +301,7 @@ program _ipwlogit, eclass
     if "`psmethod'"=="logit" {
         tempvar tmpT q
         if `tk'==2 & "`nobinary'"=="" {     // case 1: single logit
-            if "`noisily'"=="" di as txt "..." _c
+            if "`noisily'`dots'"=="" di as txt "..." _c
             qui gen byte `tmpT' = `tname'!=`tbase' if `touse'
             `qui' logit `tmpT' `xvars' `iwgt' if `touse', `psopts'
             qui predict double `q' if `touse', pr
@@ -326,7 +326,7 @@ program _ipwlogit, eclass
             local sc
             tempvar ql
             foreach l of local tlevels {
-                if "`noisily'"=="" di "." _c
+                if "`noisily'`dots'"=="" di "." _c
                 else               di _n as res "==> level `l'"
                 qui replace `tmpT' = `T'==`l' & `touse'
                 `qui' logit `tmpT' `xvars' `iwgt' if `touse', `psopts'
@@ -352,7 +352,7 @@ program _ipwlogit, eclass
     }
     // - mlogit
     else if "`psmethod'"=="mlogit" {
-        if "`noisily'"=="" di "..." _c
+        if "`noisily'`dots'"=="" di "..." _c
         `qui' mlogit `T' `xvars' `iwgt' if `touse', base(`tbase') `psopts'
         local q
         foreach l of local tlevels {
@@ -376,7 +376,7 @@ program _ipwlogit, eclass
     }
     // - ologit, gologit
     else if inlist("`psmethod'","ologit","gologit") {
-        if "`noisily'"=="" di "..." _c
+        if "`noisily'`dots'"=="" di "..." _c
         if "`psmethod'"=="gologit" local pscmd gologit2
         else                       local pscmd `psmethod'
         `qui' `pscmd' `T' `xvars' `iwgt' if `touse', `psopts'
@@ -429,7 +429,9 @@ program _ipwlogit, eclass
         local sc
         local j 0
         foreach l of local tlevels {
-            if "`noisily'"=="" di "." _c
+            if "`noisily'"=="" {
+                if "`dots'"=="" di "." _c
+            }
             else               di _n as res "==> level `l'"
             local ++j
             if `j'>1 {
@@ -449,7 +451,7 @@ program _ipwlogit, eclass
             capt assert (`ql'>=0) if `ql'<.
             if _rc==1 exit _rc
             if _rc {
-                if "`noisily'"=="" di ""
+                if "`noisily'`dots'"=="" di ""
                 di as txt "negative probabilities encountered in level `l'; reset to 0"
                 qui replace `ql' = 0 if `ql'<0 & `T'==`l' & `touse'
             }
@@ -470,7 +472,7 @@ program _ipwlogit, eclass
             }
         }
     }
-    if "`noisily'"=="" di as txt " done)"
+    if "`noisily'`dots'"=="" di as txt " done)"
     
     // analyze IPWs
     capt assert (`ipw'<.) if `touse'
@@ -580,7 +582,7 @@ program _ipwlogit, eclass
     eret scalar tk          = `tk'
     eret matrix ipwstats    = `ipwstats'
     eret local tlevels      "`tlevels'"
-    if "`ttype'"!="categorical" {
+    if "`ttype'"!="factor" {
         if "`ttype'"!="`discrete'" eret scalar bins = `bins'
         eret matrix at      = `AT'
     }

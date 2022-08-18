@@ -1,5 +1,5 @@
 {smcl}
-{* 15aug2022}{...}
+{* 18aug2022}{...}
 {hi:help ipwlogit}{...}
 {right:{browse "http://github.com/benjann/ipwlogit/"}}
 {hline}
@@ -34,6 +34,8 @@
 {synopt :{opt asbal:anced}}use balanced design (non-stabilized weights)
     {p_end}
 {synopt :{opt noi:sily}}display output from propensity score estimation
+    {p_end}
+{synopt :{opt nodot:s}}suppress propensity score estimation progress dots
     {p_end}
 {synopt :{opt nocons:tant}}suppress constant term in outcome model
     {p_end}
@@ -176,6 +178,10 @@
     propensity scores. By default, such output is suppressed.
 
 {phang}
+    {opt nodots} suppresses the propensity score estimation progress dots. {cmd:nodots}
+    has no effect of {cmd:noisily} is specified.
+
+{phang}
     {opt noconstant} suppresses the constant term (intercept) in the outcome
     model. This may be useful if you want to report odds by levels of a
     categorical treatment rather than odds ratios with respect to the base
@@ -303,7 +309,7 @@
 {synopt:{cmd:e(depvar)}}name of dependent variable{p_end}
 {synopt:{cmd:e(tvar)}}treatment variable specification{p_end}
 {synopt:{cmd:e(tname)}}name of treatment variable{p_end}
-{synopt:{cmd:e(ttype)}}{cmd:categorical}, {cmd:discrete}, or {cmd:continuous}; type of treatment variable{p_end}
+{synopt:{cmd:e(ttype)}}{cmd:factor}, {cmd:discrete}, or {cmd:continuous}; type of treatment variable{p_end}
 {synopt:{cmd:e(tlevels)}}list of treatment levels{p_end}
 {synopt:{cmd:e(tbase)}}base treatment level{p_end}
 {synopt:{cmd:e(indepvars)}}adjustment variables{p_end}
@@ -369,4 +375,6 @@
 
 {psee}
     Online:  help for
-    {helpb logit}, {helpb mlogit}, {helpb ologit}, {helpb gologit2} (if installed), {helpb riflogit} (if installed)
+    {helpb logit}, {helpb mlogit}, {helpb ologit},
+    {helpb gologit2} (if installed), {helpb riflogit} (if installed),
+    {helpb lnmor} (if installed)

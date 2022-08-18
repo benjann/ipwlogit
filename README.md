@@ -24,6 +24,14 @@ to install `gologit2`.
 
 Main changes:
 
+    17aug2022 (version 1.0.3)
+    - now requires Stata 14 or newer
+    - ttype "categorical" renamed to "factor"
+    - some adjustments to header display
+
+    16aug2022 (version 1.0.2)
+    - option nodots added
+
     15aug2022 (version 1.0.1)
     - fweights now supported
     
