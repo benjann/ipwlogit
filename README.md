@@ -24,6 +24,10 @@ to install `gologit2`.
 
 Main changes:
 
+    01sep2022 (version 1.0.4)
+    - now using Sturges' rule to determine the number of bins used to categorize
+      a continuous treatment
+
     17aug2022 (version 1.0.3)
     - now requires Stata 14 or newer
     - ttype "categorical" renamed to "factor"

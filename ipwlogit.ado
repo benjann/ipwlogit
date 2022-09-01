@@ -1,4 +1,4 @@
-*! version 1.0.3  16aug2022  Ben Jann
+*! version 1.0.4  01sep2022  Ben Jann
 
 program ipwlogit, eclass properties(svyb svyj mi)
     version 14
@@ -189,7 +189,6 @@ program _ipwlogit, eclass
             }
             local ttype "discrete"
         }
-        else if "`bins'"=="" local bins 20 // default
     }
     fvexpand `indepvars' if `touse'
     local xvars `"`r(varlist)'"'
@@ -230,6 +229,11 @@ program _ipwlogit, eclass
         di as err "remember:                           0 = negative outcome"
         di as err "          all other nonmissing values = positive outcome"
         exit 2000
+    }
+    
+    // default number of bins
+    if !inlist("`ttype'","factor","discrete") {
+        if "`bins'"=="" local bins = max(1, ceil(ln(`N')/ln(2)) + 1)
     }
     
     // process treatment variable
@@ -583,7 +587,7 @@ program _ipwlogit, eclass
     eret matrix ipwstats    = `ipwstats'
     eret local tlevels      "`tlevels'"
     if "`ttype'"!="factor" {
-        if "`ttype'"!="`discrete'" eret scalar bins = `bins'
+        if "`ttype'"!="discrete" eret scalar bins = `bins'
         eret matrix at      = `AT'
     }
     eret scalar rank        = `rank'

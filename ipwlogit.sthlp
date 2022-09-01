@@ -1,5 +1,5 @@
 {smcl}
-{* 18aug2022}{...}
+{* 01sep2022}{...}
 {hi:help ipwlogit}{...}
 {right:{browse "http://github.com/benjann/ipwlogit/"}}
 {hline}
@@ -27,7 +27,7 @@
 {synopt :{cmdab:pso:pts(}{help ipwlogit##psopts:{it:options}{cmd:)}}}options
     passed through to propensity score model
     {p_end}
-{synopt :{opt bin:s(#)}}number of bins for continuous treatment; default is 20
+{synopt :{opt bin:s(#)}}number of bins for continuous treatment
     {p_end}
 {synopt :{opt discr:ete}}treat continuous treatment as discrete
     {p_end}
@@ -139,7 +139,7 @@
 {pmore}
     The default method depends on the type of the treatment variable. For a categorical
     treatment with two levels (dichotomous treatment), the default is {cmd:logit}; for
-    a categorical treatment with more than two levels, the default is {cmd:mlogit}, for a
+    a categorical treatment with more than two levels, the default is {cmd:mlogit}; for a
     continuous or discrete treatment, {cmd:cologit} is the default. For a dichotomous treatment,
     the choice of method does not matter; results will always be the same. For an
     ordered categorical treatment, you may want to consider {cmd:cologit}
@@ -155,12 +155,14 @@
     for {helpb mlogit}; {cmd:link()} for {helpb gologit2}.
 
 {phang}
-    {opt bins(#)} sets the number of quantile bins used to categorize a continuous
-    treatment. The default is 20. The resulting number of bins my be less than
-    20 if there is heaping in the distribution of the treatment variable.
+    {opt bins(#)} sets the (maximum) number of quantile bins used to categorize
+    a continuous treatment. The resulting number of bins may be less than
+    {it:#} if there is heaping in the distribution of the treatment variable. The
+    default is to determine the number of bins as ceil(ln({it:N})/ln(2)) + 1
+    (Sturges' rule for the number of histogram bins).
 
 {phang}
-    {opt discrete} declared the treatment variable as discrete. In this case,
+    {opt discrete} declares the treatment variable as discrete. In this case,
     the variable will not be categorized based on quantiles. Use this option for
     a quantitative treatment with relatively few distinct levels.
 
