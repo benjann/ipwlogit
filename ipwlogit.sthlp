@@ -1,5 +1,5 @@
 {smcl}
-{* 01sep2022}{...}
+{* 04sep2022}{...}
 {hi:help ipwlogit}{...}
 {right:{browse "http://github.com/benjann/ipwlogit/"}}
 {hline}
@@ -59,6 +59,11 @@
 {synopt :{opt ifgen:erate(spec)}}store influence functions; {it:spec} may be
     {it:namelist} or {it:stub}{cmd:*}
     {p_end}
+{synopt :{opt rif:gerate(spec)}}store recentered influence functions; {it:spec} is
+    {it:namelist} or {it:stub}{cmd:*}
+    {p_end}
+{synopt :{opt ifs:caling(spec)}}scaling of (recentered) IFs; {it:spec} if {cmd:total} (default) or {cmd:mean}
+    {p_end}
 
 {syntab :Reporting}
 {synopt :{opt l:evel(#)}}set confidence level; default is {cmd:level(95)}
@@ -76,9 +81,6 @@
 {synopt :{opt coefl:egend}}display legend instead of statistics
     {p_end}
 {synoptline}
-{pstd}
-    {it:tvar} may be a factor variable; see {help fvvarlist}.
-    {p_end}
 {pstd}
     {it:indepvars} may contain factor variables; see {help fvvarlist}.
     {p_end}
@@ -99,14 +101,35 @@
     {it:depvar} equal to zero indicates a negative outcome.
 
 {pstd}
-    {it:tvar} can be categorical, continuous, or discrete. A categorical treatment must
-    be specified using factor variable notation, that is, as {cmd:i.}{it:varname},
-    where {it:varname} is the name of the treatment variable; see
-    {help fvvarlist}. In case of a continuous treatment, the inverse probability
-    weights will be estimated based on a coarsened variable that divides the treatment
-    into a series of equal probability bins. To declare a variable as discrete,
-    specify option {cmd:discrete}; in this case no binning will be applied (i.e.,
-    each observed treatment level has its own bin).
+    {it:tvar} can be categorical, continuous, or discrete.
+
+{phang}
+    {space 2}o Categorical treatment: Specify {it:tvar} as
+    {cmd:i.}{it:varname}, where {it:varname} is the name of the treatment
+    variable. More complicated factor-variable specifications such as, e.g.,
+    {cmd:ibn.}{it:varname}, {bind:{cmd:i(2 3 4).}{it:varname}}, or 
+    {bind:{cmd:0.}{it:varname} {cmd:1.}{it:varname}} are also allowed. In any 
+    case, the computation of inverse probability
+    weights (IPWs) will be based on the observed levels of the treatment variable,
+    not the levels specified in {it:tvar}.
+
+{phang}
+    {space 2}o Continuous treatment: Specify {it:tvar} as {it:varname} or
+    {cmd:c.}{it:varname} to model a linear effect, or as 
+    {cmd:c.}{it:varname}{cmd:##}{cmd:c.}{it:varname} to model a nonlinear
+    effect. More complicated interaction specifications such as
+    {bind:{it:varname} {cmd:c.}{it:varname}{cmd:#}{cmd:c.}{it:varname}}
+    or {cmd:c.}{it:varname}{cmd:##}{cmd:c.}{it:varname}{cmd:##}{cmd:c.}{it:varname}
+    are also allowed. The computation of IPWs will be based
+    based on a coarsened treatment variable that divides the original
+    treatment into a series of equal probability bins. Use option {cmd:bins()}
+    to control the number of bins.
+
+{phang}
+    {space 2}o Discrete treatment: Specify {it:tvar} as for a continuous 
+    treatment, but additionally apply option {cmd:discrete}. No binning will be
+    applied, that is, the computation of IPWs will be based on the observed levels
+    of the treatment variable.
 
 
 {title:Options}
@@ -151,8 +174,8 @@
     propensity score estimation command. This may be useful, for example,
     to specify constraints. See the help file of the relevant command
     ({helpb logit}, {helpb mlogit}, {helpb ologit}, or {helpb gologit2}) for
-    information on available options. The following options are not allowed: {cmd:base()}
-    for {helpb mlogit}; {cmd:link()} for {helpb gologit2}.
+    information on available options (option {cmd:link()} is not allowed in case
+    of {helpb gologit2}).
 
 {phang}
     {opt bins(#)} sets the (maximum) number of quantile bins used to categorize
@@ -176,7 +199,7 @@
     the sum of weights within each treatment levels is the same (in expectation).
 
 {phang}
-    {opt noisily} displays the output from the models used to estimate
+    {opt noisily} displays the output from the model(s) used to estimate
     propensity scores. By default, such output is suppressed.
 
 {phang}
@@ -228,6 +251,17 @@
     or specify {it:stub}{cmd:*}, in which case the new variables will be named
     {it:stub}{cmd:1}, {it:stub}{cmd:2}, etc. Option {cmd:ifgenerate()} is not
     allowed with {cmd:vce(bootstrap)} or {cmd:vce(jackknife)}.
+
+{phang}
+    {opt rifgenerate(spec)} stores the recentered influence functions; see the description
+    of {cmd:ifgenerate()}. Only one of {cmd:ifgenerate()} and {cmd:rifgenerate()}
+    is allowed.
+
+{phang}
+    {opt ifscaling(spec)} determines the scaling of the stored (recentered) influence
+    functions. {it:spec} can be {opt t:otal} (scaling for analysis by
+    {helpb total}) or {opt m:ean} (scaling for analysis by {helpb mean}). Default is 
+    {cmd:ifscaling(total)}.
 
 {phang}
     {opt level(#)} specifies the confidence level, as a percentage, for
@@ -286,8 +320,9 @@
 {synoptset 23 tabbed}{...}
 {p2col 5 23 26 2: Scalars}{p_end}
 {synopt:{cmd:e(N)}}number of observations{p_end}
-{synopt:{cmd:e(tk)}}number of treatment levels{p_end}
-{synopt:{cmd:e(bins)}}number of requested bins; continuous treatment only{p_end}
+{synopt:{cmd:e(sum_w)}}sum of base weights{p_end}
+{synopt:{cmd:e(tk)}}number of treatment levels/bins{p_end}
+{synopt:{cmd:e(bins)}}requested number of bins; continuous treatment only{p_end}
 {synopt:{cmd:e(k)}}number of parameters in outcome model{p_end}
 {synopt:{cmd:e(k_eq)}}number of equations in outcome model{p_end}
 {synopt:{cmd:e(df_m)}}degrees of freedom of outcome model{p_end}
@@ -313,7 +348,6 @@
 {synopt:{cmd:e(tname)}}name of treatment variable{p_end}
 {synopt:{cmd:e(ttype)}}{cmd:factor}, {cmd:discrete}, or {cmd:continuous}; type of treatment variable{p_end}
 {synopt:{cmd:e(tlevels)}}list of treatment levels{p_end}
-{synopt:{cmd:e(tbase)}}base treatment level{p_end}
 {synopt:{cmd:e(indepvars)}}adjustment variables{p_end}
 {synopt:{cmd:e(psmethod)}}propensity score estimation method{p_end}
 {synopt:{cmd:e(psopts)}}options passed through to propensity score estimation{p_end}
@@ -330,12 +364,14 @@
 {synopt:{cmd:e(generate)}}name of variable containing IPWs{p_end}
 {synopt:{cmd:e(tgenerate)}}name of variable containing binned treatment{p_end}
 {synopt:{cmd:e(ifgenerate)}}names of variables containing IFs{p_end}
+{synopt:{cmd:e(iftype)}}{cmd:IF} or {cmd:RIF} (or empty){p_end}
+{synopt:{cmd:e(ifscaling)}}{cmd:total} or {cmd:mean} (or empty){p_end}
 
 {p2col 5 23 26 2: Matrices}{p_end}
 {synopt:{cmd:e(b)}}coefficient vector{p_end}
 {synopt:{cmd:e(V)}}variance-covariance matrix of the estimators{p_end}
 {synopt:{cmd:e(V_modelbased)}}model-based variance{p_end}
-{synopt:{cmd:e(at)}}breaks of continuous treatment or levels of discrete treatment{p_end}
+{synopt:{cmd:e(at)}}breaks of continuous treatment or values of discrete treatment{p_end}
 {synopt:{cmd:e(ipwstats)}}information on the distribution of the IPWs{p_end}
 
 {p2col 5 23 26 2: Functions}{p_end}

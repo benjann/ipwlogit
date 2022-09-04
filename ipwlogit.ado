@@ -1,4 +1,4 @@
-*! version 1.0.4  01sep2022  Ben Jann
+*! version 1.0.5  04sep2022  Ben Jann
 
 program ipwlogit, eclass properties(svyb svyj mi)
     version 14
@@ -24,7 +24,8 @@ end
 program _parse_opts
     _parse comma lhs 0 : 0
     syntax [, or eform(passthru) vce(passthru) NOVCEADJust ///
-        GENerate(passthru) TGENerate(passthru) IFGENerate(passthru) * ]
+        GENerate(passthru) TGENerate(passthru) IFGENerate(passthru) ///
+        RIFgenerate(passthru) * ]
     local options `vce' `options'
     // replace option -or- by eform()
     if "`or'"!="" {
@@ -42,14 +43,15 @@ program _parse_opts
             di as err "{bf:tgenerate()} not allowed with replication based VCE"
             exit 198
         }
-        if `"`ifgenerate'"'!="" {
+        if `"`ifgenerate'`rifgenerate'"'!="" {
             di as err "{bf:ifgenerate()} not allowed with replication based VCE"
             exit 198
         }
         local novceadjust novceadjust
     }
     // returns
-    c_local 00 `lhs', `generate' `tgenerate' `ifgenerate' `novceadjust' `options'
+    c_local 00 `lhs', `generate' `tgenerate' `ifgenerate' `rifgenerate' /*
+        */ `novceadjust' `options'
 end
 
 program _parse_opts_vce
@@ -74,7 +76,9 @@ program Display
         else if d(`c(born_date)')<d(13jul2021) local headopts
         _coef_table_header, `headopts'
         di as txt _col(`c1') "Treatment type" _col(`c2') "= " as res %`w2's e(ttype)
-        di as txt _col(`c1') "Number of levels" _col(`c2') "= " as res %`w2'.0g e(tk)
+        if `"`e(ttype)'"'=="continuous" local tmp bins
+        else                            local tmp levels
+        di as txt _col(`c1') "Number of `tmp'" _col(`c2') "= " as res %`w2'.0g e(tk)
         di as txt _col(`c1') "PS method" _col(`c2') "= " as res %`w2's e(psmethod)
         di ""
     }
@@ -89,24 +93,44 @@ program Display
         }
     }
     if "`ipwstats'"=="" {
+        if `"`e(ttype)'"'=="continuous"    local tmp bin ID
+        else if `"`e(ttype)'"'=="discrete" local tmp level ID
+        else                               local tmp level
         di _n as txt "Distribution of IPWs" _c
-        matlist e(ipwstats), lines(none) showcoleq(combined) row(level)
+        matlist e(ipwstats), lines(none) showcoleq(combined) row(`tmp')
     }
 end
 
 program _ipwlogit, eclass
-    syntax varlist(min=1 numeric fv) [if] [in] [pw fw iw] [, ///
+    syntax varlist(min=2 numeric fv) [if] [in] [pw fw iw] [, ///
         PSMethod(str) PSOpts(str asis) ///
         NOBINARY /// undocumented; use general code even if treatment is binary
         BINs(numlist int max=1 >=2) DISCRete ASBALanced ///
-        GENerate(name) TGENerate(name) IFGENerate(str) replace ///
-        vce(passthru) Robust CLuster(passthru) NOVCEADJust ///
-        NOIsily eform(passthru) noHEADer noIPWstats noTABle ///
+        GENerate(name) TGENerate(name) IFGENerate(str) RIFgenerate(str) ///
+        IFScaling(str) replace vce(passthru) Robust CLuster(passthru) ///
+        NOVCEADJust NOIsily eform(passthru) noHEADer noIPWstats noTABle ///
         noCONStant noDOTs * ]
     
     // generate option
     if "`generate'`tgenerate'"!="" & "`replace'"=="" {
         confirm new variable `generate' `tgenerate'
+    }
+    
+    // ifgen
+    if `"`rifgenerate'"'!="" {
+        if `"`ifgenerate'"'!="" {
+            di as err "{bf:ifgenerate()} and {bf:rifgenerate()} not both allowed"
+            exit 198
+        }
+        local ifgenerate `"`rifgenerate'"'
+        local iftype     "RIF"
+    }
+    else if `"`ifgenerate'"'!="" local iftype "IF"
+    capt _parse_ifscaling, `ifscaling'
+    if _rc==1 exit _rc
+    if _rc {
+        di as err "{bf:ifscaling()}: invalid specification"
+        exit 198
     }
     
     // psmethod option
@@ -152,21 +176,25 @@ program _ipwlogit, eclass
     
     // parse variables
     gettoken depvar indepvars : varlist
-    if `:list depvar in indepvars' {
-        di as err "{it:depvar} must be unique"
-        exit 198
-    }
-    gettoken tvar indepvars : indepvars, bind
-    if `:list tvar in indepvars' {
-        di as err "{it:tvar} must be unique"
-        exit 198
-    }
-    local indepvars `indepvars'
     _fv_check_depvar `depvar'
+    _get_tvar `touse' `indepvars' // returns tvar, tname, ttype, indepvars
     fvexpand `tvar' if `touse'
-    local texpand `"`r(varlist)'"'
-    if `"`r(fvops)'"'!="" local ttype "factor"
-    else                  local ttype "continuous"
+    local texpand `r(varlist)'
+    fvexpand `indepvars' if `touse'
+    local xvars `r(varlist)'
+    _get_xnames `xvars' // returns xnames
+    if `:list depvar in xnames' {
+        di as err "{it:depvar} may not be included in {it:indepvars}"
+        exit 198
+    }
+    if "`depvar'"=="`tname'" {
+        di as err "{it:depvar} may not be included in {it:tvar}"
+        exit 198
+    }
+    if `:list tname in xnames' {
+        di as err "{it:tvar} may not be included in {it:indepvars}"
+        exit 198
+    }
     if "`ttype'"=="factor" {
         if "`bins'"!="" {
             di as err "{bf:bins()} not allowed with categorical treatment"
@@ -190,8 +218,6 @@ program _ipwlogit, eclass
             local ttype "discrete"
         }
     }
-    fvexpand `indepvars' if `touse'
-    local xvars `"`r(varlist)'"'
     
     // parse ifgenerate()
     if `"`ifgenerate'"'!="" {
@@ -217,9 +243,10 @@ program _ipwlogit, eclass
     }
     
     // process outcome variable
-    tempvar Y
+    tempvar Y sum_w
     qui gen byte `Y' = (`depvar'!=0) if `touse'
     sum `Y' if `touse' `awgt', meanonly
+    scalar `sum_w' = r(sum_w)
     local N = r(N)
     if `N'==0 {
         error 2000
@@ -239,8 +266,10 @@ program _ipwlogit, eclass
     // process treatment variable
     // - categorical
     if "`ttype'"=="factor" {
-        _collect_fvinfo `texpand' // returns tname, tk, tlevels, tbase
         local T `tname'
+        qui levelsof `T' if `touse'
+        local tlevels `r(levels)'
+        local tk: list sizeof tlevels
         if `tk'<2 {
             di as err "treatment does not vary"
             exit 2000
@@ -252,7 +281,6 @@ program _ipwlogit, eclass
     }
     // - continuous
     else {
-        local tname "`texpand'"
         if "`psmethod'"=="" local psmethod "cologit"
         // categorize
         tempvar T
@@ -291,7 +319,6 @@ program _ipwlogit, eclass
             di as err "(coarsened) treatment does not vary"
             exit 2000
         }
-        local tbase 1
     }
     
     // compute IPWs
@@ -306,6 +333,7 @@ program _ipwlogit, eclass
         tempvar tmpT q
         if `tk'==2 & "`nobinary'"=="" {     // case 1: single logit
             if "`noisily'`dots'"=="" di as txt "..." _c
+            local tbase: word 1 of `tlevels'
             qui gen byte `tmpT' = `tname'!=`tbase' if `touse'
             `qui' logit `tmpT' `xvars' `iwgt' if `touse', `psopts'
             qui predict double `q' if `touse', pr
@@ -357,7 +385,7 @@ program _ipwlogit, eclass
     // - mlogit
     else if "`psmethod'"=="mlogit" {
         if "`noisily'`dots'"=="" di "..." _c
-        `qui' mlogit `T' `xvars' `iwgt' if `touse', base(`tbase') `psopts'
+        `qui' mlogit `T' `xvars' `iwgt' if `touse', `psopts'
         local q
         foreach l of local tlevels {
             tempvar ql
@@ -579,9 +607,9 @@ program _ipwlogit, eclass
     eret local tvar         "`tvar'"
     eret local tname        "`tname'"
     eret local ttype        "`ttype'"
-    eret local tbase        "`tbase'"
     eret local indepvars    "`indepvars'"
     eret local asbaanced    "`asbalanced'"
+    eret scalar sum_w       = `sum_w'
     eret scalar k_eq        = 1
     eret scalar tk          = `tk'
     eret matrix ipwstats    = `ipwstats'
@@ -633,19 +661,39 @@ program _ipwlogit, eclass
         eret local tgenerate `"`tgenerate'"'
     }
     if "`ifgenerate'"!="" {
-        local coln: coln e(b)
+        tempname b
+        mat `b' = e(b)
+        local coln: coln `b'
+        local j 0
         foreach v of local ifgenerate {
+            local ++j
             gettoken IF IFs : IFs
             if "`IF'"=="" continue, break
+            if "`iftype'"=="RIF" {
+                qui replace `IF' = `IF' + `b'[1,`j']/`sum_w'
+            }
+            if "`ifscaling'"=="mean" {
+                qui replace `IF'  = `IF' * `sum_w'
+            }
             gettoken nm coln : coln
+            lab var `IF' "`iftype' of _b[`nm']"
             capt confirm variable `v', exact
             if _rc==1 exit _rc
             if _rc==0 drop `v'
-            lab var `IF' "IF of _b[`nm']"
             rename `IF' `v'
         }
         eret local ifgenerate "`ifgenerate'"
+        eret local iftype "`iftype'"
+        eret local ifscaling "`ifscaling'"
     }
+end
+
+program _parse_ifscaling
+    syntax [, Mean Total ]
+    local ifscaling `mean' `total'
+    if `: list sizeof ifscaling'>1 exit 198
+    if `"`ifscaling'"'=="" local ifscaling total
+    c_local ifscaling `ifscaling'
 end
 
 program _parse_psmethod
@@ -675,38 +723,66 @@ program _parse_psmethod_gologit_opts
     }
 end
 
-program _collect_fvinfo
-    local levels
-    local baselevel
-    foreach term of local 0 {
-         _ms_parse_parts `term'
-         if `"`r(type)'"'!="factor" {
-             di as err "invalid specificaton of {it:tvar}"
-             exit 198
-         }
-         if "`name'"!="" {
-             if `"`r(name)'"'!="`name'" {
-                 di as err "invalid specificaton of {it:tvar}"
-                 exit 198
-             }
-         }
-         local name `"`r(name)'"'
-         local levels `levels' `r(level)'
-         if r(omit) local baselevel `baselevel' `r(level)'
+program _get_tvar
+    gettoken touse 0 : 0
+    // step 1: separate tvar from indepvars
+    gettoken term: 0, bind
+    while ("`term'"!="") {
+        fvexpand `term' if `touse'
+        _get_names_and_types `r(varlist)' // returns names types
+        if "`tvar'"=="" {
+            local tname `names'
+        }
+        if "`names'"=="`tname'" {
+            local tvar `tvar' `term'
+            local ttype `ttype' `types'
+            gettoken term 0 : 0, bind
+            gettoken term: 0, bind
+            continue
+        }
+        continue, break
     }
-    local nbase: list sizeof baselevel
-    if `nbase'>1 {
+    c_local indepvars `0'
+    // step 2: check tvar
+    if `: list sizeof tname'!=1 {
         di as err "invalid specificaton of {it:tvar}"
         exit 198
     }
-    if `nbase'==0 {
-        // use first level as base in PS models if no base level specified
-        local baselevel: word 1 of `levels'
+    local ttype: list uniq ttype
+    local ttype: list sort ttype
+    if inlist("`ttype'","variable","interaction","interaction variable") {
+        local ttype "continuous"
     }
-    c_local tname     "`name'"
-    c_local tk        : list sizeof levels // assumed unique and sorted
-    c_local tlevels   "`levels'"
-    c_local tbase     "`baselevel'"
+    else if "`ttype'"!="factor" {
+        di as err "invalid specificaton of {it:tvar}"
+        exit 198
+    }
+    c_local tvar `tvar'
+    c_local tname `tname'
+    c_local ttype `ttype'
+end
+
+program _get_names_and_types
+    foreach t of local 0 {
+        _ms_parse_parts `t'
+        local type `r(type)'
+        local types `types' `type'
+        if inlist("`type'", "interaction", "product") {
+            forv i=1/`r(k_names)' {
+                local names `names' `r(name`i')'
+            }
+        }
+        else {
+            local names `names' `r(name)'
+        }
+    }
+    c_local types: list uniq types
+    c_local names: list uniq names
+end
+
+program _get_xnames
+    _get_names_and_types `0'
+    c_local xnames `names'
 end
 
 program _get_V
@@ -836,7 +912,7 @@ real matrix _y_times_X(real colvector y, real matrix X, real rowvector info)
 
 void _adjust_IFs()
 {
-    real scalar      tk, tbase, l, j
+    real scalar      tk, l, j
     string scalar    psm, touse
     real rowvector   tl
     string rowvector sc, tV
@@ -847,7 +923,6 @@ void _adjust_IFs()
     psm   = st_local("psmethod")
     tk    = strtoreal(st_local("tk"))
     tl    = strtoreal(tokens(st_local("tlevels")))
-    tbase = strtoreal(st_local("tbase"))
     touse = st_local("touse")
     T     = st_data(., st_local("T"),   touse)
     ipw   = st_data(., st_local("ipw"), touse)
@@ -867,7 +942,7 @@ void _adjust_IFs()
             tIF = _predict_IF(_get_sc(sc, touse), tX, st_matrix(tV), info)
             // compute adjustment
             q = st_data(., st_local("q"), touse)
-            dw = w :* ((-1):^(T:!=tbase) :* (1:-q) :* ipw)
+            dw = w :* ((-1):^(T:!=tl[1]) :* (1:-q) :* ipw)
             dw = _y_times_X(dw, tX, info)
             for (j=cols(IF); j; j--) tAdj[,j] = tIF * quadcolsum(IF[,j] :* dw)'
         }

@@ -24,6 +24,13 @@ to install `gologit2`.
 
 Main changes:
 
+    04sep2022 (version 1.0.5)
+    - tvar may now contain polynomials; parsing of varlist improved
+    - for categorical tvar, IPWs will now always be based on the observed levels,
+      not the levels specified in tvar
+    - options -rifgenerate()- and -ifscaling()- added
+    - e(sum_w) added to returns
+
     01sep2022 (version 1.0.4)
     - now using Sturges' rule to determine the number of bins used to categorize
       a continuous treatment
