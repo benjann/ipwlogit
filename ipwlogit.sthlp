@@ -1,5 +1,5 @@
 {smcl}
-{* 04sep2022}{...}
+{* 20oct2022}{...}
 {hi:help ipwlogit}{...}
 {right:{browse "http://github.com/benjann/ipwlogit/"}}
 {hline}
@@ -26,6 +26,8 @@
     {p_end}
 {synopt :{cmdab:pso:pts(}{help ipwlogit##psopts:{it:options}{cmd:)}}}options
     passed through to propensity score model
+    {p_end}
+{synopt :{opt trunc:ate(#)}}truncate weights, {it:#} in [0,.5]
     {p_end}
 {synopt :{opt bin:s(#)}}number of bins for continuous treatment
     {p_end}
@@ -178,6 +180,14 @@
     of {helpb gologit2}).
 
 {phang}
+    {opt truncate(#)}, {it:#} in [0,0.5], applies truncation to the inverse
+    probability weights. Within each treatment level, weights smaller than
+    quantile {it:#} will be replaced by the value of quantile {it:#} and weights
+    larger than quantile 1-{it:#} will be replaced by the value of
+    quantile 1-{it:#}. For example, type {cmd:truncate(0.01)} to truncate the
+    weights to the 1st and 99th percentile.
+
+{phang}
     {opt bins(#)} sets the (maximum) number of quantile bins used to categorize
     a continuous treatment. The resulting number of bins may be less than
     {it:#} if there is heaping in the distribution of the treatment variable. The
@@ -322,6 +332,7 @@
 {synopt:{cmd:e(N)}}number of observations{p_end}
 {synopt:{cmd:e(sum_w)}}sum of base weights{p_end}
 {synopt:{cmd:e(tk)}}number of treatment levels/bins{p_end}
+{synopt:{cmd:e(truncate)}}value of {cmd:truncate()}{p_end}
 {synopt:{cmd:e(bins)}}requested number of bins; continuous treatment only{p_end}
 {synopt:{cmd:e(k)}}number of parameters in outcome model{p_end}
 {synopt:{cmd:e(k_eq)}}number of equations in outcome model{p_end}
@@ -351,7 +362,7 @@
 {synopt:{cmd:e(indepvars)}}adjustment variables{p_end}
 {synopt:{cmd:e(psmethod)}}propensity score estimation method{p_end}
 {synopt:{cmd:e(psopts)}}options passed through to propensity score estimation{p_end}
-{synopt:{cmd:e(asbaanced)}}{cmd:asbaanced} or empty{p_end}
+{synopt:{cmd:e(asbalanced)}}{cmd:asbalanced} or empty{p_end}
 {synopt:{cmd:e(mlopts)}}maximization options passed through to outcome model{p_end}
 {synopt:{cmd:e(wtype)}}weight type{p_end}
 {synopt:{cmd:e(wexp)}}weight expression{p_end}
@@ -387,8 +398,8 @@
 {title:References}
 
 {phang}
-    Jann, Ben, and Kristian Bernt Karlson. 2022. Marginal odds ratios: What they
-    are, how to compute them, and why sociologists might want to use them. Working paper.
+    Jann, Ben, and Kristian Bernt Karlson. 2022. Estimation of marginal odds
+    ratios. Working paper.
     {p_end}
 {phang}
     Williams, Richard. 2006. Generalized ordered logit/partial proportional odds

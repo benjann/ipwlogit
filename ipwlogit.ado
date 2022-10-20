@@ -1,4 +1,4 @@
-*! version 1.0.5  04sep2022  Ben Jann
+*! version 1.0.6  20oct2022  Ben Jann
 
 program ipwlogit, eclass properties(svyb svyj mi)
     version 14
@@ -79,6 +79,9 @@ program Display
         if `"`e(ttype)'"'=="continuous" local tmp bins
         else                            local tmp levels
         di as txt _col(`c1') "Number of `tmp'" _col(`c2') "= " as res %`w2'.0g e(tk)
+        if e(truncate)<. {
+            di as txt _col(`c1') "Truncation" _col(`c2') "= " as res %`w2'.0g e(truncate)
+        }
         di as txt _col(`c1') "PS method" _col(`c2') "= " as res %`w2's e(psmethod)
         di ""
     }
@@ -103,13 +106,16 @@ end
 
 program _ipwlogit, eclass
     syntax varlist(min=2 numeric fv) [if] [in] [pw fw iw] [, ///
-        PSMethod(str) PSOpts(str asis) ///
+        PSMethod(str) PSOpts(str asis) TRUNCate(numlist max=1 >=0 <=5) ///
         NOBINARY /// undocumented; use general code even if treatment is binary
         BINs(numlist int max=1 >=2) DISCRete ASBALanced ///
         GENerate(name) TGENerate(name) IFGENerate(str) RIFgenerate(str) ///
         IFScaling(str) replace vce(passthru) Robust CLuster(passthru) ///
         NOVCEADJust NOIsily eform(passthru) noHEADer noIPWstats noTABle ///
         noCONStant noDOTs * ]
+    if "`truncate'"!="" {
+        if `truncate'==0 local truncate
+    }
     
     // generate option
     if "`generate'`tgenerate'"!="" & "`replace'"=="" {
@@ -326,8 +332,9 @@ program _ipwlogit, eclass
         local qui quietly
         if "`dots'"=="" di as txt "(estimating balancing weights " _c
     }
-    tempvar ipw
+    tempvar ipw pzero
     qui gen double `ipw' = .
+    qui gen byte `pzero' = 0 if `touse'
     // - logit
     if "`psmethod'"=="logit" {
         tempvar tmpT q
@@ -350,6 +357,7 @@ program _ipwlogit, eclass
                 _get_V `tV'
                 qui predict double `sc' if e(sample), score
             }
+            qui replace `pzero' = 1 if `q'==0 & `touse'
         }
         else {                      // case 2: individual logit for each level
             qui gen byte `tmpT' = .
@@ -380,6 +388,7 @@ program _ipwlogit, eclass
                     qui predict double `scl' if e(sample), score
                 }
             }
+            qui replace `pzero' = 1 if `q'==0 & `touse'
         }
     }
     // - mlogit
@@ -398,6 +407,7 @@ program _ipwlogit, eclass
                 su `l'.`T' `awgt' if `touse', meanonly
                 qui replace `ipw' = r(mean) / `ql' if `T'==`l' & `touse'
             }
+            qui replace `pzero' = 1 if `ql'==0 & `T'==`l' & `touse'
         }
         if `vceadj' {
             tempname tV
@@ -423,6 +433,14 @@ program _ipwlogit, eclass
         foreach l of local tlevels {
             local ++j
             qui predict double `ql' if `touse', pr outcome(`l')
+            if "`psmethod'"=="gologit" {
+                capt assert (`ql'>=0) if `ql'<.
+                if _rc==1 exit _rc
+                if _rc {
+                    di as txt "negative probabilities encountered in level `l'; reset to 0"
+                    qui replace `ql' = 0 if `ql'<0 & `T'==`l' & `touse'
+                }
+            }
             if "`asbalanced'"!="" {
                 qui replace `ipw' = 1 / `ql' if `T'==`l' & `touse'
             }
@@ -441,6 +459,7 @@ program _ipwlogit, eclass
                     qui replace `q1' = 0 if `T'>=`l' & `touse'
                 }
             }
+            qui replace `pzero' = 1 if `ql'==0 & `T'==`l' & `touse'
             drop `ql'
         }
         if `vceadj' {
@@ -494,6 +513,7 @@ program _ipwlogit, eclass
                 su `l'.`T' `awgt' if `touse', meanonly
                 qui replace `ipw' = r(mean) / `ql' if `T'==`l' & `touse'
             }
+            qui replace `pzero' = 1 if `ql'==0 & `T'==`l' & `touse'
             drop `ql'
             if `vceadj' & `j'<`tk' {
                 tempname tVl scl
@@ -505,6 +525,18 @@ program _ipwlogit, eclass
         }
     }
     if "`noisily'`dots'"=="" di as txt " done)"
+    
+    // truncate of IPWs
+    if "`truncate'"!="" {
+        local plo = `truncate' * 100
+        local pup = (1 - `truncate') * 100
+        foreach l of local tlevels {
+             _pctile `ipw' if `T'==`l' & `touse' `awgt', p(`plo' `pup')
+            qui replace `ipw' = r(r1) if `ipw'<r(r1) & `T'==`l' & `touse'
+            qui replace `ipw' = r(r2) if `ipw'>r(r2) & /*
+                */ (`ipw'<. | `pzero'==1) & `T'==`l' & `touse'
+        }
+    }
     
     // analyze IPWs
     capt assert (`ipw'<.) if `touse'
@@ -608,7 +640,10 @@ program _ipwlogit, eclass
     eret local tname        "`tname'"
     eret local ttype        "`ttype'"
     eret local indepvars    "`indepvars'"
-    eret local asbaanced    "`asbalanced'"
+    eret local asbalanced   "`asbalanced'"
+    if "`truncate'"!="" {
+        eret scalar truncate = `truncate'
+    }
     eret scalar sum_w       = `sum_w'
     eret scalar k_eq        = 1
     eret scalar tk          = `tk'

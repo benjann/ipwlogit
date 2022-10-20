@@ -11,7 +11,8 @@ categorical, continuous, or discrete.
 
 Installation from GitHub:
 
-    . net install ipwlogit, replace from(https://raw.githubusercontent.com/benjann/ipwlogit/main/)
+    . net from https://raw.githubusercontent.com/benjann/ipwlogit/main/
+    . net install ipwlogit, replace
 
 `ipwlogit` with option `psmethod(gologit)` requires
 [`gologit2`](https://www3.nd.edu/~rwilliam/gologit2/) by Richard Williams. Type
@@ -23,6 +24,9 @@ to install `gologit2`.
 ---
 
 Main changes:
+
+    20oct2022 (version 1.0.6)
+    - option truncate() added
 
     04sep2022 (version 1.0.5)
     - tvar may now contain polynomials; parsing of varlist improved
