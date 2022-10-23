@@ -181,11 +181,13 @@
 
 {phang}
     {opt truncate(#)}, {it:#} in [0,0.5], applies truncation to the inverse
-    probability weights. Within each treatment level, weights smaller than
-    quantile {it:#} will be replaced by the value of quantile {it:#} and weights
-    larger than quantile 1-{it:#} will be replaced by the value of
+    probability weights. Weights smaller than quantile {it:#} of the overall
+    distribution of weights will be replaced by the value of quantile {it:#}
+    and weights larger than quantile 1-{it:#} will be replaced by the value of
     quantile 1-{it:#}. For example, type {cmd:truncate(0.01)} to truncate the
-    weights to the 1st and 99th percentile.
+    weights to the 1st and 99th percentile. Truncation will always be applied
+    on the basis of stabilized weights; truncated non-stabilized weights will be
+    obtained by rescaling the truncated stabilized weights.
 
 {phang}
     {opt bins(#)} sets the (maximum) number of quantile bins used to categorize
