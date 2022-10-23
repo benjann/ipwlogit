@@ -1,4 +1,4 @@
-*! version 1.0.6  20oct2022  Ben Jann
+*! version 1.0.7  23oct2022  Ben Jann
 
 program ipwlogit, eclass properties(svyb svyj mi)
     version 14
@@ -64,7 +64,7 @@ program _parse_opts_vce
 end
 
 program Display
-    syntax [, or noHEADer noTABle noIPWstats * ]
+    syntax [, or noHEADer noTABle noIPW * ]
     if "`or'"!="" local eform eform(Odds Ratio)
     if "`header'"=="" {
         local w1 17
@@ -95,12 +95,12 @@ program Display
             di as txt "(adjusted for " as res `"`xvars'"' as txt ")"
         }
     }
-    if "`ipwstats'"=="" {
+    if "`ipw'"=="" {
         if `"`e(ttype)'"'=="continuous"    local tmp bin ID
         else if `"`e(ttype)'"'=="discrete" local tmp level ID
         else                               local tmp level
         di _n as txt "Distribution of IPWs" _c
-        matlist e(ipwstats), lines(none) showcoleq(combined) row(`tmp')
+        matlist e(ipw), lines(none) showcoleq(combined) row(`tmp')
     }
 end
 
@@ -111,7 +111,7 @@ program _ipwlogit, eclass
         BINs(numlist int max=1 >=2) DISCRete ASBALanced ///
         GENerate(name) TGENerate(name) IFGENerate(str) RIFgenerate(str) ///
         IFScaling(str) replace vce(passthru) Robust CLuster(passthru) ///
-        NOVCEADJust NOIsily eform(passthru) noHEADer noIPWstats noTABle ///
+        NOVCEADJust NOIsily eform(passthru) noHEADer noIPW noTABle ///
         noCONStant noDOTs * ]
     if "`truncate'"!="" {
         if `truncate'==0 local truncate
@@ -144,7 +144,7 @@ program _ipwlogit, eclass
     
     // collect diopts
     _get_diopts diopts options, `options'
-    c_local diopts `eform' `header' `ipwstats' `table' `diopts'
+    c_local diopts `eform' `header' `ipw' `table' `diopts'
 
     // maximize options (for outcome model)
     mlopts mlopts, `options'
@@ -326,6 +326,11 @@ program _ipwlogit, eclass
             exit 2000
         }
     }
+    // - prepare matrix for unconditional probabilities
+    tempname prop
+    matrix `prop' = J(1, `tk', .)
+    mat coln `prop' = `tlevels'
+    mat rown `prop' = "Pr(T=t)"
     
     // compute IPWs
     if "`noisily'"=="" {
@@ -345,13 +350,10 @@ program _ipwlogit, eclass
             `qui' logit `tmpT' `xvars' `iwgt' if `touse', `psopts'
             qui predict double `q' if `touse', pr
             qui replace `q' = 1 - `q' if !`tmpT' & `touse'
-            if "`asbalanced'"!="" {
-                qui replace `ipw' = 1 / `q' if `touse'
-            }
-            else {
-                su `tmpT' `awgt' if `touse', meanonly
-                qui replace `ipw' = cond(`tmpT', r(mean), 1-r(mean)) / `q' if `touse'
-            }
+            su `tmpT' `awgt' if `touse', meanonly
+            matrix `prop'[1,1] = 1 - r(mean)
+            matrix `prop'[1,2] = r(mean)
+            qui replace `ipw' = cond(`tmpT', r(mean), 1-r(mean)) / `q' if `touse'
             if `vceadj' {
                 tempname tV sc
                 _get_V `tV'
@@ -365,7 +367,9 @@ program _ipwlogit, eclass
             local tV
             local sc
             tempvar ql
+            local j 0
             foreach l of local tlevels {
+                local ++j
                 if "`noisily'`dots'"=="" di "." _c
                 else               di _n as res "==> level `l'"
                 qui replace `tmpT' = `T'==`l' & `touse'
@@ -373,13 +377,9 @@ program _ipwlogit, eclass
                 qui predict double `ql' if `tmpT', pr
                 qui replace `q' = `ql' if `tmpT'
                 drop `ql'
-                if "`asbalanced'"!="" {
-                    qui replace `ipw' = 1 / `q' if `tmpT'
-                }
-                else {
-                    su `tmpT' `awgt' if `touse', meanonly
-                    qui replace `ipw' = r(mean) / `q' if `tmpT'
-                }
+                su `tmpT' `awgt' if `touse', meanonly
+                matrix `prop'[1, `j'] = r(mean)
+                qui replace `ipw' = r(mean) / `q' if `tmpT'
                 if `vceadj' {
                     tempname tVl scl
                     local tV `tV' `tVl'
@@ -396,17 +396,15 @@ program _ipwlogit, eclass
         if "`noisily'`dots'"=="" di "..." _c
         `qui' mlogit `T' `xvars' `iwgt' if `touse', `psopts'
         local q
+        local j 0
         foreach l of local tlevels {
+            local ++j
             tempvar ql
             local q `q' `ql'
             qui predict double `ql' if `touse', pr outcome(`l')
-            if "`asbalanced'"!="" {
-                qui replace `ipw' = 1 / `ql' if `T'==`l' & `touse'
-            }
-            else {
-                su `l'.`T' `awgt' if `touse', meanonly
-                qui replace `ipw' = r(mean) / `ql' if `T'==`l' & `touse'
-            }
+            su `l'.`T' `awgt' if `touse', meanonly
+            matrix `prop'[1, `j'] = r(mean)
+            qui replace `ipw' = r(mean) / `ql' if `T'==`l' & `touse'
             qui replace `pzero' = 1 if `ql'==0 & `T'==`l' & `touse'
         }
         if `vceadj' {
@@ -441,13 +439,9 @@ program _ipwlogit, eclass
                     qui replace `ql' = 0 if `ql'<0 & `T'==`l' & `touse'
                 }
             }
-            if "`asbalanced'"!="" {
-                qui replace `ipw' = 1 / `ql' if `T'==`l' & `touse'
-            }
-            else {
-                su `l'.`T' `awgt' if `touse', meanonly
-                qui replace `ipw' = r(mean) / `ql' if `T'==`l' & `touse'
-            }
+            su `l'.`T' `awgt' if `touse', meanonly
+            matrix `prop'[1, `j'] = r(mean)
+            qui replace `ipw' = r(mean) / `ql' if `T'==`l' & `touse'
             if `vceadj' {
                 if `j'>1 {
                     qui replace `q0' = `q1' if `T'>=`l' & `touse'
@@ -480,11 +474,11 @@ program _ipwlogit, eclass
         local sc
         local j 0
         foreach l of local tlevels {
+            local ++j
             if "`noisily'"=="" {
                 if "`dots'"=="" di "." _c
             }
             else               di _n as res "==> level `l'"
-            local ++j
             if `j'>1 {
                 qui replace `q0' = `q1' if `T'>=`l' & `touse'
             }
@@ -506,13 +500,9 @@ program _ipwlogit, eclass
                 di as txt "negative probabilities encountered in level `l'; reset to 0"
                 qui replace `ql' = 0 if `ql'<0 & `T'==`l' & `touse'
             }
-            if "`asbalanced'"!="" {
-                qui replace `ipw' = 1 / `ql' if `T'==`l' & `touse'
-            }
-            else {
-                su `l'.`T' `awgt' if `touse', meanonly
-                qui replace `ipw' = r(mean) / `ql' if `T'==`l' & `touse'
-            }
+            su `l'.`T' `awgt' if `touse', meanonly
+            matrix `prop'[1, `j'] = r(mean)
+            qui replace `ipw' = r(mean) / `ql' if `T'==`l' & `touse'
             qui replace `pzero' = 1 if `ql'==0 & `T'==`l' & `touse'
             drop `ql'
             if `vceadj' & `j'<`tk' {
@@ -526,15 +516,21 @@ program _ipwlogit, eclass
     }
     if "`noisily'`dots'"=="" di as txt " done)"
     
-    // truncate of IPWs
+    // truncate IPWs
     if "`truncate'"!="" {
         local plo = `truncate' * 100
         local pup = (1 - `truncate') * 100
+        _pctile `ipw' if `touse' `awgt', p(`plo' `pup')
+        qui replace `ipw' = r(r1) if `ipw'<r(r1) & `touse'
+        qui replace `ipw' = r(r2) if `ipw'>r(r2) & (`ipw'<. | `pzero') & `touse'
+    }
+    
+    // asbalanced
+    if "`asbalanced'"!="" {
+        local j 0
         foreach l of local tlevels {
-             _pctile `ipw' if `T'==`l' & `touse' `awgt', p(`plo' `pup')
-            qui replace `ipw' = r(r1) if `ipw'<r(r1) & `T'==`l' & `touse'
-            qui replace `ipw' = r(r2) if `ipw'>r(r2) & /*
-                */ (`ipw'<. | `pzero'==1) & `T'==`l' & `touse'
+            local ++j
+            qui replace `ipw' = `ipw' / `prop'[1,`j'] if `T'==`l' & `touse'
         }
     }
     
@@ -548,9 +544,9 @@ program _ipwlogit, eclass
     qui tabstat `ipw' `awgt' if `touse', by(`T') nototal save ///
         stats(count mean sum min max cv) 
     tempname tmp ipwstats
-    forv i = 1/`tk' {
-        mat `tmp' = r(Stat`i')
-        mat coln `tmp' = `"`r(name`i')'"'
+    forv j = 1/`tk' {
+        mat `tmp' = r(Stat`j')
+        mat coln `tmp' = `"`r(name`j')'"'
         mat `ipwstats' = nullmat(`ipwstats') \ `tmp''
     }
     
@@ -647,7 +643,8 @@ program _ipwlogit, eclass
     eret scalar sum_w       = `sum_w'
     eret scalar k_eq        = 1
     eret scalar tk          = `tk'
-    eret matrix ipwstats    = `ipwstats'
+    eret matrix prop        = `prop'
+    eret matrix ipw         = `ipwstats'
     eret local tlevels      "`tlevels'"
     if "`ttype'"!="factor" {
         if "`ttype'"!="discrete" eret scalar bins = `bins'

@@ -25,6 +25,14 @@ to install `gologit2`.
 
 Main changes:
 
+    20oct2022 (version 1.0.7)
+    - truncate() is now applied to the overall distribution of stabilized weights
+      across all treatment levels, i.e. truncate() is no longer applied to each
+      treatment levels individually; non-stabilized weights are computed after
+      applying truncate()
+    - e(ipwstats) renamed to e(ipw)
+    - marginal treatment probabilities now returned in e(prop)
+
     20oct2022 (version 1.0.6)
     - option truncate() added
 

@@ -1,5 +1,5 @@
 {smcl}
-{* 20oct2022}{...}
+{* 23oct2022}{...}
 {hi:help ipwlogit}{...}
 {right:{browse "http://github.com/benjann/ipwlogit/"}}
 {hline}
@@ -383,7 +383,8 @@
 {synopt:{cmd:e(V)}}variance-covariance matrix of the estimators{p_end}
 {synopt:{cmd:e(V_modelbased)}}model-based variance{p_end}
 {synopt:{cmd:e(at)}}breaks of continuous treatment or values of discrete treatment{p_end}
-{synopt:{cmd:e(ipwstats)}}information on the distribution of the IPWs{p_end}
+{synopt:{cmd:e(prop)}}marginal treatment probabilities{p_end}
+{synopt:{cmd:e(ipw)}}information on the distribution of the IPWs{p_end}
 
 {p2col 5 23 26 2: Functions}{p_end}
 {synopt:{cmd:e(sample)}}marks estimation sample{p_end}
