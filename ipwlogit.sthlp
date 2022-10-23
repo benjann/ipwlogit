@@ -76,7 +76,7 @@
     {p_end}
 {synopt :{opt notab:le}}suppress table of results
     {p_end}
-{synopt :{opt noipw:stats}}suppress table of IPW statistics
+{synopt :{opt noipw}}suppress table of IPW statistics
     {p_end}
 {synopt :{help estimation options##display_options:{it:display_options}}}standard display option
     {p_end}
@@ -292,7 +292,7 @@
     {opt notable} suppresses the display of the table of results.
 
 {phang}
-    {opt noipwstats} suppresses the display of the table of IPW statistics.
+    {opt noipw} suppresses the display of the table of IPW statistics.
 
 {phang}
     {it:display_options} are usual display options as documented in
