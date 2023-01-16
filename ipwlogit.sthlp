@@ -1,5 +1,5 @@
 {smcl}
-{* 06jan2023}{...}
+{* 16jan2023}{...}
 {hi:help ipwlogit}{...}
 {right:{browse "http://github.com/benjann/ipwlogit/"}}
 {hline}
@@ -347,7 +347,7 @@
         . {stata ipwlogit low i.smoke, or}
 
         {it:conditional odds ratio}
-        . {stata logit low i.smoke age lwt i.race ptl ht ui, or}
+        . {stata logit low i.smoke age lwt i.race ptl ht ui, or vce(robust)}
 
         {it:adjusted marginal odds ratio}
         . {stata ipwlogit low i.smoke age lwt i.race ptl ht ui, or}
