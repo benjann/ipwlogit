@@ -25,6 +25,11 @@ to install `gologit2`.
 
 Main changes:
 
+    16jan2023 (version 1.0.8)
+    - support for vce(svy) added
+    - iweights no longer imply -novceadj-
+    - vce(bootstrap) and vce(jackknife) did not pick up level(); this is fixed
+
     20oct2022 (version 1.0.7)
     - truncate() is now applied to the overall distribution of stabilized weights
       across all treatment levels, i.e. truncate() is no longer applied to each

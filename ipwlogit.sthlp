@@ -1,5 +1,5 @@
 {smcl}
-{* 23oct2022}{...}
+{* 06jan2023}{...}
 {hi:help ipwlogit}{...}
 {right:{browse "http://github.com/benjann/ipwlogit/"}}
 {hline}
@@ -54,7 +54,7 @@
 {syntab :SE/Robust}
 {synopt :{cmd:vce(}{help ipwlogit##vcetype:{it:vcetype}}{cmd:)}}variance estimation
     method; {it:vcetype} may be {cmdab:r:obust}, {cmdab:cl:uster} {it:clustvar},
-    {cmdab:boot:strap}, or {cmdab:jack:knife}
+    {cmd:svy}, {cmdab:boot:strap}, or {cmdab:jack:knife}
     {p_end}
 {synopt :{opt novceadj:ust}}treat IPWs as fixed
     {p_end}
@@ -133,6 +133,10 @@
     applied, that is, the computation of IPWs will be based on the observed levels
     of the treatment variable.
 
+{pstd}
+    For details on inverse probability weighting and marginal odds ratios see
+    {browse "https://ideas.repec.org/p/bss/wpaper/44.html":Jann and Karlson (2023)}.
+
 
 {title:Options}
 
@@ -158,7 +162,7 @@
     {p_end}
 {p2col:{opt co:logit}}fit a series of cumulative odds models across
     treatment levels (using command {helpb logit}); this is asymptotically
-    equivalent to {helpb gologit2}, but with less computational burden
+    equivalent to {helpb gologit2}, but imposes less computational burden
     {p_end}
 
 {pmore}
@@ -245,17 +249,40 @@
 
 {marker vcetype}{...}
 {phang}
-    {cmd:vce(}{it:vcetype}{cmd:)} specifies the type of standard error
-    reported. {it:vcetype} may be {cmd:robust} (robust standard errors),
-    {cmdab:cl:uster} {it:clustvar} (cluster-robust standard errors), {cmdab:boot:strap}
-    or {cmdab:jack:knife}; for bootstrap and jackknife see {it:{help vce_option}}. The
-    default is {cmd:vce(robust)}.
+    {cmd:vce(}{it:vcetype}{cmd:)} specifies how standard errors
+    are computed. {it:vcetype} may be:
+
+            {opt r:obust}
+            {opt cl:uster} {it:clustvar}
+            {opt svy} [{help svy##svy_vcetype:{it:svy_vcetype}}] [{cmd:,} {help svy##svy_options:{it:svy_options}} ]
+            {opt boot:strap} [{cmd:,} {help bootstrap:{it:bootstrap_options}} ]
+            {opt jack:knife} [{cmd:,} {help jackknife:{it:jackknife_options}} ]
+
+{pmore}
+    {cmd:vce(robust)}, the default, computes robust standard errors based on
+    influence functions.
+
+{pmore}
+    {bind:{cmd:vce(cluster} {it:clustvar}{cmd:)}} computes standard errors based
+    on influence functions allowing for intragroup correlation, where
+    {it:clustvar} specifies to which group each observation belongs.
+
+{pmore}
+    {cmd:vce(svy)} computes standard errors taking the survey design as set by
+    {helpb svyset} into account. The syntax is equivalent to the syntax of the {helpb svy}
+    prefix command; that is, {cmd:vce(svy)} is {cmd:ipwlogit}'s way to support
+    the {helpb svy} prefix.
+
+{pmore}
+    {cmd:vce(bootstrap)} and {cmd:vce(jackknife)} compute standard errors using
+    {helpb bootstrap} or {helpb jackknife}, respectively; see help {it:{help vce_option}}.
 
 {phang}
     {opt novceadjust} assumes the IPWs as fixed (rather than estimated)
     when computing standard errors. This typically leads to slightly
-    conservative results. {cmd:iweight}s imply {cmd:novceadjust}, as do
-    {cmd:vce(bootstrap)} and {cmd:vce(jackknife)} (to save computer time).
+    conservative results. {cmd:vce(bootstrap)}, {cmd:vce(jackknife)}, and
+    {cmd:vce(svy)} with replication-based VCE imply {cmd:novceadjust}
+    (to save a little bit of computer time).
 
 {phang}
     {opt ifgenerate(spec)} stores the influence functions of the parameters of the
@@ -285,7 +312,9 @@
     that is, exp(b) rather than b. Standard errors and confidence intervals are
     similarly transformed. This option affects how results are displayed, not
     how they are estimated. {cmd:or} may be specified at estimation or when
-    replaying previously estimated results.
+    replaying previously estimated results. When applying multiple imputation,
+    specify {cmd:or} as option to {helpb mi estimate}, not as option to
+    {cmd:ipwlogit}.
 
 {phang}
     {opt noheader} suppresses the display of the table header.
@@ -392,17 +421,12 @@
 {synopt:{cmd:e(sample)}}marks estimation sample{p_end}
 
 
-{title:Methods and Formulas}
-
-{pstd}
-    See Jann and Karlson (2022).
-
-
 {title:References}
 
 {phang}
-    Jann, Ben, and Kristian Bernt Karlson. 2022. Estimation of marginal odds
-    ratios. Working paper.
+    Jann, Ben, Kristian Bernt Karlson. 2023. Estimation of marginal odds ratios. University
+    of Bern Social Sciences Working Papers 44. Available from
+    {browse "https://ideas.repec.org/p/bss/wpaper/44.html"}.
     {p_end}
 {phang}
     Williams, Richard. 2006. Generalized ordered logit/partial proportional odds
@@ -419,7 +443,8 @@
     Thanks for citing this software as follows:
 
 {pmore}
-    Jann, B. (2022). ipwlogit: Stata module to fit marginal logistic regression by inverse probability weighting. Available from
+    Jann, B. (2022). ipwlogit: Stata module to fit marginal logistic regression
+    by inverse probability weighting. Available from
     {browse "http://github.com/benjann/ipwlogit/"}.
 
 

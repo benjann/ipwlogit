@@ -1,19 +1,36 @@
-*! version 1.0.7  23oct2022  Ben Jann
+*! version 1.0.8  16jan2023  Ben Jann
 
-program ipwlogit, eclass properties(svyb svyj mi)
+program ipwlogit, eclass properties(or svyb svyj mi)
     version 14
     if replay() {
         Display `0'
         exit
     }
     local version : di "version " string(_caller()) ":"
-    _parse_opts `0' // returns 00
-    `version' _vce_parserun ipwlogit, mark(CLuster) : `00'
-    if "`s(exit)'" != "" {
-        ereturn local cmdline `"ipwlogit `0'"'
-        exit
+    _parse_opts `0' // returns 00, vcetype, diopts
+    if "`vcetype'"=="svyr" {
+        nobreak {
+            capt noisily break {
+                `version' `00'
+            }
+            if _rc {
+                local rc = _rc
+                capt mata mata drop _IPWLOGIT_TMP_IFs
+                exit `rc'
+            }
+        }
+        _ereturn_svy
     }
-    _ipwlogit `00' // returns diopts
+    else if "`vcetype'"=="svyb" {
+        `version' `00'
+        _ereturn_svy
+    }
+    else if "`vcetype'"!="" {
+        `version' `00'
+    }
+    else {
+        Estimate `00'
+    }
     eret local cmdline `"ipwlogit `0'"'
     Display, `diopts'
     if `"`e(generate)'`e(tgenerate)'`e(ifgenerate)'"'!="" {
@@ -23,18 +40,25 @@ end
 
 program _parse_opts
     _parse comma lhs 0 : 0
-    syntax [, or eform(passthru) vce(passthru) NOVCEADJust ///
-        GENerate(passthru) TGENerate(passthru) IFGENerate(passthru) ///
-        RIFgenerate(passthru) * ]
-    local options `vce' `options'
-    // replace option -or- by eform()
-    if "`or'"!="" {
-        if `"`eform'"'=="" local eform eform(Odds ratio)
-        local options `eform' `options'
+    syntax [, or noHEADer noIPW noTABle Level(passthru) /*
+        */ vce(str) NOVCEADJust GENerate(passthru) TGENerate(passthru) /*
+        */ IFGENerate(passthru) RIFgenerate(passthru) * ]
+    // display options
+    _get_diopts diopts options, `options'
+    local diopts `or' `header' `ipw' `table' `diopts'
+    // determine type of VCE
+    if `"`vce'"'!="" {
+        _parse_opts_vce `vce' // returns vcetype vcearg vcelevel vceopts
+        if `"`vcelevel'"'!=""   local level `vcelevel' // vcelevel takes precedence
+        else if `"`level'"'!="" local vcelevel `level'
     }
-    // bootstrap/jackknife
-    _parse_opts_vce, `vce' // returns repl
-    if `repl' {
+    if "`vcetype'"=="svyr" {         // svy linearized
+        local lhs svy `vcearg', noheader notable `vcelevel' `vceopts':/*
+            */_ipwlogit_svy estimate `lhs'
+        local vce
+        local novceadjust `novceadjust' saveifuninmata
+    }
+    else if "`vcetype'"!="" { // bootstrap/jackknife, svy replication-based
         if `"`generate'"'!="" {
             di as err "{bf:generate()} not allowed with replication based VCE"
             exit 198
@@ -47,46 +71,97 @@ program _parse_opts
             di as err "{bf:ifgenerate()} not allowed with replication based VCE"
             exit 198
         }
+        if "`vcetype'"=="svyb" {    // svy replication-based
+            local lhs svy `vcearg', noheader notable `vcelevel' `vceopts':/*
+                */ _ipwlogit_svy estimate `lhs'
+            local vce
+        }
+        else {                      // bootstrap/jackknife
+             local lhs _vce_parserun ipwlogit, wtypes(pw iw) mark(CLuster) /*
+                 */ `vcetype'opts(noheader notable force): `lhs'
+        }
         local novceadjust novceadjust
     }
     // returns
-    c_local 00 `lhs', `generate' `tgenerate' `ifgenerate' `rifgenerate' /*
-        */ `novceadjust' `options'
+    if `"`vce'"'!="" local vce vce(`vce')
+    local options `generate' `tgenerate' `ifgenerate' `rifgenerate'/*
+        */ `novceadjust' `vce' `level' `options'
+    c_local 00 `lhs', `options'
+    c_local vcetype `vcetype'
+    c_local diopts `level' `diopts'
 end
 
 program _parse_opts_vce
-    syntax [, vce(str) ]
-    gettoken v : vce, parse(", ")
-    local repl 0
-    if      `"`v'"'==substr("bootstrap",1,max(4,strlen(`"`v'"'))) local repl 1
-    else if `"`v'"'==substr("jackknife",1,max(4,strlen(`"`v'"'))) local repl 1
-    c_local repl `repl'
+    _parse comma vce 0 : 0
+    gettoken vce vcearg : vce
+    mata: st_local("vcearg", strtrim(st_local("vcearg")))
+    if `"`vce'"'=="svy" {
+        qui svyset
+        if `"`r(settings)'"'==", clear" {
+             di as err "data not set up for svy, use {helpb svyset}"
+             exit 119
+        }
+        if `"`vcearg'"'=="" local vcearg `"`r(vce)'"'
+        if `"`vcearg'"'== substr("linearized",1,max(3,strlen(`"`vcearg'"'))) /*
+            */ local vce svyr
+        else   local vce svyb
+    }
+    else if `"`vce'"'==substr("bootstrap",1,max(4,strlen(`"`vce'"'))) local vce boot
+    else if `"`vce'"'==substr("jackknife",1,max(4,strlen(`"`vce'"'))) local vce jk
+    else local vce
+    syntax [, Level(passthru) * ]
+    c_local vcetype  `vce'
+    c_local vcearg   `vcearg'
+    c_local vcelevel `level'
+    c_local vceopts  `options'
+end
+
+program _ereturn_svy, eclass
+    eret local cmd "ipwlogit"
+    eret local cmdname ""
+    eret local command ""
+    eret local predict ""
 end
 
 program Display
-    syntax [, or noHEADer noTABle noIPW * ]
+    syntax [, or eform(passthru) noHEADer noTABle noIPW * ]
     if "`or'"!="" local eform eform(Odds Ratio)
+    local options `eform' `options'
     if "`header'"=="" {
+        local hflex 1
+        if      c(stata_version)<17            local hflex 0
+        else if d(`c(born_date)')<d(13jul2021) local hflex 0
         local w1 17
         local c1 49
         local c2 = `c1' + `w1' + 1
         local w2 10
-        local headopts head2left(`w1') head2right(`w2')
-        if      c(stata_version)<17            local headopts
-        else if d(`c(born_date)')<d(13jul2021) local headopts
+        local c3 = `c2' + 2
+        if `hflex' local headopts head2left(`w1') head2right(`w2')
+        else       local headopts
         _coef_table_header, `headopts'
-        di as txt _col(`c1') "Treatment type" _col(`c2') "= " as res %`w2's e(ttype)
+        if `hflex' {
+            // if _coef_table_header used more space than allocated
+            local offset1 = max(0, `s(head2_left)' - `w1')
+            local offset2 = max(0, `s(head2_right)' - `w2')
+            local c1 = `c1' - `offset1' - `offset2'
+            local c2 = `c2' - `offset2'
+        }
+        di as txt _col(`c1') "Treatment type" _col(`c2') "=" _col(`c3')/*
+            */ as res %`w2's e(ttype)
         if `"`e(ttype)'"'=="continuous" local tmp bins
         else                            local tmp levels
-        di as txt _col(`c1') "Number of `tmp'" _col(`c2') "= " as res %`w2'.0g e(tk)
+        di as txt _col(`c1') "Number of `tmp'" _col(`c2') "=" _col(`c3')/*
+            */ as res %`w2'.0g e(tk)
         if e(truncate)<. {
-            di as txt _col(`c1') "Truncation" _col(`c2') "= " as res %`w2'.0g e(truncate)
+            di as txt _col(`c1') "Truncation" _col(`c2') "=" _col(`c3')/*
+                */ as res %`w2'.0g e(truncate)
         }
-        di as txt _col(`c1') "PS method" _col(`c2') "= " as res %`w2's e(psmethod)
+        di as txt _col(`c1') "PS method" _col(`c2') "=" _col(`c3')/*
+            */ as res %`w2's e(psmethod)
         di ""
     }
     if "`table'"=="" {
-        eret display, first `eform' `options'
+        eret display, first `options' // -first- to suppress eqname
         local xvars `"`e(indepvars)'"'
         if `"`xvars'"'!="" {
             if (strlen(`"`xvars'"')>63) {
@@ -104,15 +179,17 @@ program Display
     }
 end
 
-program _ipwlogit, eclass
+program Estimate, eclass
     syntax varlist(min=2 numeric fv) [if] [in] [pw fw iw] [, ///
         PSMethod(str) PSOpts(str asis) TRUNCate(numlist max=1 >=0 <=5) ///
         NOBINARY /// undocumented; use general code even if treatment is binary
         BINs(numlist int max=1 >=2) DISCRete ASBALanced ///
-        GENerate(name) TGENerate(name) IFGENerate(str) RIFgenerate(str) ///
-        IFScaling(str) replace vce(passthru) Robust CLuster(passthru) ///
-        NOVCEADJust NOIsily eform(passthru) noHEADer noIPW noTABle ///
-        noCONStant noDOTs * ]
+        GENerate(name) TGENerate(name) ///
+        IFGENerate(str) RIFgenerate(str) IFScaling(str) replace ///
+        vce(passthru) Robust CLuster(passthru) NOVCEADJust ///
+        saveifuninmata /// undocumented; used by svyr
+        Level(cilevel) /// (not used)
+        NOIsily noCONStant noDOTs * ]
     if "`truncate'"!="" {
         if `truncate'==0 local truncate
     }
@@ -142,10 +219,6 @@ program _ipwlogit, eclass
     // psmethod option
     _parse_psmethod, `psmethod' psopts(`psopts') // returns psmethod
     
-    // collect diopts
-    _get_diopts diopts options, `options'
-    c_local diopts `eform' `header' `ipw' `table' `diopts'
-
     // maximize options (for outcome model)
     mlopts mlopts, `options'
     
@@ -155,6 +228,7 @@ program _ipwlogit, eclass
         [`weight'`exp'], `vce' `robust' `cluster'
     local vce      `"`r(vceopt)'"'
     local clustvar `"`r(cluster)'"'
+    local vceadj   = "`novceadjust'"==""
     
     // prepare weights
     if "`weight'"!="" {
@@ -175,10 +249,6 @@ program _ipwlogit, eclass
         // weights for total
         local twgt `"[`weight'=`wvar']"'
     }
-    
-    // iweights imply novceadjust
-    if "`weight'"=="iweight" local novceadjust novceadjust
-    local vceadj = "`novceadjust'"==""
     
     // parse variables
     gettoken depvar indepvars : varlist
@@ -575,6 +645,7 @@ program _ipwlogit, eclass
     mat `V' = e(V)
     mat coleq `V' = "`depvar'"
     mat roweq `V' = "`depvar'"
+    local rank = e(rank)
     if !`vceadj' {
         local vce `"`e(vce)'"'
         local vcetype `"`e(vcetype)'"'
@@ -595,31 +666,39 @@ program _ipwlogit, eclass
         tempname V_modelbased
         mat `V_modelbased' = `V'
     }
-    if `vceadj' | "`ifgenerate'"!="" {
+    if `vceadj' | "`ifgenerate'`saveifuninmata'"!="" {
         mata: _mktmpnames("IFs", cols(st_matrix("e(b)")))
         _predict_logit_IF "`IFs'" "`touse'" "`texpand'" "`V_modelbased'"
         if `vceadj' {
             mata: _adjust_IFs()
-            if "`clustvar'"!="" local vceopt `vce'
-            else                local vceopt
-            qui total `IFs' `twgt' if `touse', `vceopt'
-            if "`clustvar'"!="" {
-                local vce `"`e(vce)'"'
-                local vcetype `"`e(vcetype)'"'
+            if "`saveifuninmata'"=="" {
+                if "`clustvar'"!="" local vceopt `vce'
+                else                local vceopt
+                qui total `IFs' `twgt' if `touse', `vceopt'
+                if "`clustvar'"!="" {
+                    local vce `"`e(vce)'"'
+                    local vcetype `"`e(vcetype)'"'
+                }
+                else {
+                    local vce robust
+                    local vcetype Robust
+                }
+                mata: st_replacematrix(st_local("V"), st_matrix("e(V)"))
+                local rank = e(rank)
             }
-            else {
-                local vce robust
-                local vcetype Robust
-            }
-            mata: st_replacematrix(st_local("V"), st_matrix("e(V)"))
         }
         else { // (unadjusted IFs)
             foreach IF of local IFs {
                 qui replace `IF' = `ipw' * `IF' if `touse'
             }
         }
+        if "`saveifuninmata'"!="" {
+            local rank = colsof(`V')
+            mata: *crexternal("_IPWLOGIT_TMP_IFs") = st_data(., st_local("IFs"))
+            mata: st_replacematrix(st_local("V"), I(`=colsof(`V')'))
+            local V_modelbased `V'
+        }
     }
-    local rank = e(rank)
     local N_clust = e(N_clust)
     
     // post results
@@ -663,16 +742,18 @@ program _ipwlogit, eclass
     else if _rc==0 {
         eret matrix V_modelbased = `V_modelbased'
     }
-    if `vceadj' {
-        qui test [#1]
-        eret scalar chi2 = r(chi2)
-        eret scalar p    = r(p)
-        local chi2type "Wald"
-    }
-    else {
-        eret scalar chi2        = `chi2'
-        eret scalar p           = `chi2_p'
-        eret local chi2type     `"`chi2type'"'
+    if "`saveifuninmata'"=="" {
+        if `vceadj' {
+            qui test [#1]
+            eret scalar chi2 = r(chi2)
+            eret scalar p    = r(p)
+            local chi2type "Wald"
+        }
+        else {
+            eret scalar chi2        = `chi2'
+            eret scalar p           = `chi2_p'
+            eret local chi2type     `"`chi2type'"'
+        }
     }
     
     // generate
